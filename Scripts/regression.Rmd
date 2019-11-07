@@ -1,0 +1,101 @@
+---
+title: "AAE724"
+author: "naixin zhang"
+date: "November 4, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("C:/Users/Naixin/Documents/AAE724") 
+```
+```{r}
+#install.packages("jtools")
+#install.packages('maps')
+#install.packages("zipcode")
+install.packages('jsonlite')
+```
+```{r}
+library(lfe)
+library(dplyr)
+library(jtools)
+library(maps)
+library(zipcode)
+library(jsonlite)
+```
+```{r}
+data = read.csv('clean_data_lat.csv')
+head(data)
+```
+```{r}
+data %>% mutate(year = as.factor(Discharge.Year))
+head(data)
+```
+
+```{r}
+data1 <- data %>% rename(admission ='Type.of.Admission',year = 'Discharge.Year',severity = 'APR.Severity.of.Illness.Code',
+          mortality = 'APR.Risk.of.Mortality', isSurgical = 'APR.Medical.Surgical.Description', 
+          payment ='Payment.Typology.1',isAbortion='Abortion.Edit.Indicator',emergency = 'Emergency.Department.Indicator',charges = 'Total.Charges',zip ='Zip.Code...3.digits') %>%
+  mutate(zip = as.factor(zip),
+         year = as.factor(year),
+         severity = as.factor(severity))
+head(data1)
+```
+
+```{r}
+reg0 <- felm(length ~ Race + Ethnicity + admission + year + severity + mortality + isSurgical + payment + emergency + charges + new_age | 0|0|0, data =data1)
+summary(reg0)
+```
+
+
+```{r}
+reg <- felm(length ~ Race + Ethnicity + admission + year + severity + mortality + isSurgical + payment + emergency + charges + new_age | zip|0|0, data =data1)
+summary(reg)
+```
+```{r}
+map('state', region = c('new york'),
+    fill = TRUE, col = rainbow(5))
+title("NEW YORK")
+```
+
+```{r}
+#install.packages('ggmap')
+# prepare data, long and lat
+library(ggmap)
+ny <- map_data('county') %>%
+  filter(region == 'new york')
+l <- min(ny$long); r <- max(ny$long)
+b <- min(ny$lat);  t <- max(ny$lat)
+
+# https://cosx.org/2013/01/drawing-map-in-r-era/
+
+library(ggmap)
+library(mapproj)
+
+CALmap <- get_stamenmap(bbox = c(left   = l - 0.1, right  = r + 0.1,
+                                bottom = b - 0.1, top    = t + 0.1),
+                       maptype = "terrain", zoom = 6) 
+data_f <- data1 %>%
+  group_by(zip) %>%
+  summarise(people = n(), lon = mean(lon), lat = mean(lat))
+
+ggmap(CALmap) +
+    geom_point(data=data_f,aes(x=lon,y=lat,size = people), colour = 'red',alpha=0.5)+
+      scale_size_continuous(limits = c(0,25000)) +
+      ggtitle("The distribution of patients in new york area") 
+
+
+ggsave(filename = "distribution.jpg")
+```
+
+```{r}
+
+```
+```{r}
+export_summs(reg0, reg, scale = TRUE, to.file = "docx", file.name = "test.docx")
+```
+
+
